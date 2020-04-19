@@ -5,6 +5,7 @@
 demo
 00
 05/*.hack
+06/**/*.asm
 
 # stuff I haven't done yet
 07
