@@ -1,0 +1,57 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/01/Or16.hdl
+
+/**
+ * 16-bit bitwise Eq:
+ * for i = 0..15 out[i] = (a[i] == b[i])
+ */
+
+CHIP Id16 {
+    IN a[16], b[16];
+    OUT out;
+
+    PARTS:
+    // Put your code here:
+    Eq(a=a[0], b=b[0], out=out0);
+    Eq(a=a[1], b=b[1], out=out1);
+    Eq(a=a[2], b=b[2], out=out2);
+    Eq(a=a[3], b=b[3], out=out3);
+    Eq(a=a[4], b=b[4], out=out4);
+    Eq(a=a[5], b=b[5], out=out5);
+    Eq(a=a[6], b=b[6], out=out6);
+    Eq(a=a[7], b=b[7], out=out7);
+    Eq(a=a[8], b=b[8], out=out8);
+    Eq(a=a[9], b=b[9], out=out9);
+    Eq(a=a[10], b=b[10], out=out10);
+    Eq(a=a[11], b=b[11], out=out11);
+    Eq(a=a[12], b=b[12], out=out12);
+    Eq(a=a[13], b=b[13], out=out13);
+    Eq(a=a[14], b=b[14], out=out14);
+    Eq(a=a[15], b=b[15], out=out15);
+
+    // First layer of And'ing
+    And(a=out0, b=out1, out=outtwo0);
+    And(a=out2, b=out3, out=outtwo1);
+    And(a=out4, b=out5, out=outtwo2);
+    And(a=out6, b=out7, out=outtwo3);
+    And(a=out8, b=out9, out=outtwo4);
+    And(a=out10, b=out11, out=outtwo5);
+    And(a=out12, b=out13, out=outtwo6);
+    And(a=out14, b=out15, out=outtwo7);
+
+    // Second layer
+    And(a=outtwo0, b=outtwo1, out=outthree0);
+    And(a=outtwo2, b=outtwo3, out=outthree1);
+    And(a=outtwo4, b=outtwo5, out=outthree2);
+    And(a=outtwo6, b=outtwo7, out=outthree3);
+
+    // Third Layer
+    And(a=outthree0, b=outthree1, out=outfour0);
+    And(a=outthree2, b=outthree3, out=outfour1);
+
+    // Final And
+    And(a=outfour0, b=outfour1, out=out);
+
+}
