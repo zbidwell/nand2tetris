@@ -1,0 +1,111 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/05/CPU.hdl
+
+/**
+ * The Hack CPU (Central Processing unit), consisting of an ALU,
+ * two registers named A and D, and a program counter named PC.
+ * The CPU is designed to fetch and execute instructions written in 
+ * the Hack machine language. In particular, functions as follows:
+ * Executes the inputted instruction according to the Hack machine 
+ * language specification. The D and A in the language specification
+ * refer to CPU-resident registers, while M refers to the external
+ * memory location addressed by A, i.e. to Memory[A]. The inM input 
+ * holds the value of this location. If the current instruction needs 
+ * to write a value to M, the value is placed in outM, the address 
+ * of the target location is placed in the addressM output, and the 
+ * writeM control bit is asserted. (When writeM==0, any value may 
+ * appear in outM). The outM and writeM outputs are combinational: 
+ * they are affected instantaneously by the execution of the current 
+ * instruction. The addressM and pc outputs are clocked: although they 
+ * are affected by the execution of the current instruction, they commit 
+ * to their new values only in the next time step. If reset==1 then the 
+ * CPU jumps to address 0 (i.e. pc is set to 0 in next time step) rather 
+ * than to the address resulting from executing the current instruction. 
+ */
+
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+
+    // Unpacking of instruction[16]
+    // 'op' bit selects between C instruction (op=1) and A Instruction (op=0)
+    And(a=instruction[15], b=true, out=op);
+    Not(in=instruction[15], out=notOp);
+    // 'a' bit selects whether to pull input into ALU from A register or Memory[A]
+    And(a=instruction[12], b=true, out=a);
+    // 'c' bits are input flags to ALU
+    And(a=instruction[11], b=true, out=c1); // zx
+    And(a=instruction[10], b=true, out=c2); // nx
+    And(a=instruction[9], b=true, out=c3); // zy
+    And(a=instruction[8], b=true, out=c4); // ny
+    And(a=instruction[7], b=true, out=c5); // f
+    And(a=instruction[6], b=true, out=c6); // no
+    // 'd' bits select where to write output of ALU
+    And(a=instruction[5], b=true, out=d1); // write to A
+    And(a=instruction[4], b=true, out=d2); // write to D
+    And(a=instruction[3], b=true, out=d3); // write to M[A]
+    // 'j' bits select jump condition for ALU output
+    And(a=instruction[2], b=true, out=j1); // jmp if < 0 
+    And(a=instruction[1], b=true, out=j2); // jmp if = 0
+    And(a=instruction[0], b=true, out=j3); // jmp if > 0
+
+
+    // This chooses between passing instruction or the output of the
+    // ALU into the A register based on the 'op' bit.
+    Mux16(a=outALU, b=instruction, sel=notOp, out=inAReg);
+
+    // Load the A register if either A instruction or 'write to A' (d1) flag is set
+    Or(a=notOp, b=d1, out=loadAReg);
+    // The A register always outputs to addressM
+    ARegister(in=inAReg, load=loadAReg, out=outAReg, out[0..14]=addressM);
+
+    // Load the D register if both C instruction and 'write to D' (d2) flag is set
+    And(a=op, b=d2, out=loadDReg);
+    DRegister(in=outALU, load=loadDReg, out=outDReg);
+
+    // output either A or M[A] based on (C instruction and 'a' bit)
+    And(a=op, b=a, out=AMswitch);
+    Mux16(a=outAReg, b=inM, sel=AMswitch, out=AMout);
+
+    // Load ALU with X = D register and Y = (A or M[A] based on 'a' bit)
+    // Also set flags using c1-c6 and output to outM and zr and ng flags.
+    ALU(
+        x=outDReg, y=AMout,
+        zx=c1, nx=c2,
+        zy=c3, ny=c4,
+        f=c5, no=c6,
+        out=outM, out=outALU,
+        zr=isZero, ng=isNeg
+    );
+
+    // write to writeM if C instruction and 'write to M' (d3) bits are set
+    And(a=op, b=d3, out=writeM);
+
+    // Calculate jump logic from flags into single doJump flag
+    And(a=isZero, b=j2, out=jumpCauseEq); // jump because output is zero and =0 flag is set
+    And(a=isNeg, b=j1, out=jumpCauseNeg); // jump because output is negative and <0 flag is set
+    // (!negative & !zero) -> positive
+    Not(in=isNeg, out=notNeg);
+    Not(in=isZero, out=notZero);
+    And(a=notNeg, b=notZero, out=isPos);
+    And(a=isPos, b=j3, out=jumpCausePos); // jump because output is positive and >0 flag is set
+
+    Or8Way(in[0]=jumpCauseEq, in[1]=jumpCauseNeg, in[2]=jumpCausePos, out=goodJump);
+    And(a=op, b=goodJump, out=doJump); // only jump if this is a C instruction
+
+    // load from A reg if doJump is set, otherwise increment
+    PC(in=outAReg, load=doJump, inc=true, reset=reset, out[0..14]=pc);
+}
